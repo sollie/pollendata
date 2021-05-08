@@ -1,7 +1,12 @@
 const puppeteer = require('puppeteer');
 
-puppeteer.launch().then(async browser => {
-
+puppeteer.launch({
+  executablePath: '/usr/bin/chromium-browser',
+  headless: true,
+  args: [
+    '--no-sandbox', '--disable-gpu'
+  ]
+}).then(async browser => {
   const page = await browser.newPage();
   let url = 'https://www.naaf.no/pollenvarsel/';
   await page.goto(url, {'waitUntil': 'networkidle0', 'timeout': 0}).catch(e => {
