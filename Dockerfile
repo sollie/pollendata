@@ -1,4 +1,6 @@
 FROM node:16-alpine
+LABEL maintainer "Pål Sollie <sollie@sparkz.no>"
+LABEL org.opencontainers.image.source https://github.com/sollie/pollendata
 
 RUN apk add --no-cache \
     udev \
