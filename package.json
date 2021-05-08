@@ -1,0 +1,7 @@
+{
+  "name": "pollen_scrape",
+  "version": "1.0.0",
+  "dependencies": {
+    "puppeteer": "9.1.1"
+  }
+}
