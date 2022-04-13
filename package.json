@@ -6,6 +6,6 @@
   "license": "MIT",
   "main": "app.js",
   "dependencies": {
-    "puppeteer": "10.0.0"
+    "puppeteer": "13.5.2"
   }
 }
