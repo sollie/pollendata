@@ -1,7 +1,6 @@
 # pollendata
 
-Fetch and cache pollendata from https://pollenvarsel.naaf.no/charts/forecast.
-Expose as rest api.
+Fetches and caches pollendata from https://pollenvarsel.naaf.no/charts/forecast.
 
 ## Endpoints
 
