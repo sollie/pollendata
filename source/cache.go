@@ -13,8 +13,8 @@ func updateCache() {
 	log.Println("Starting cache update loop...")
 	// Start loop to update cache, run every 10 seconds
 	for {
-		// Check if cache is younger than 10 minutes, if so, skip update
-		if time.Since(lastUpdated) < 10*time.Minute {
+		// Check if cache is younger than 60 minutes, if so, skip update
+		if time.Since(lastUpdated) < 60*time.Minute {
 			continue
 		}
 
