@@ -27,8 +27,9 @@ type Pollen struct {
 	Salix  int `json:"salix"`
 }
 type Regions struct {
-	ID     string `json:"id"`
-	Pollen Pollen `json:"pollen"`
+	ID           string `json:"id"`
+	Pollen       Pollen `json:"pollen"`
+	TextForecast string `json:"forecast,-"`
 }
 type ForecastData struct {
 	Date    string    `json:"date"`
@@ -52,7 +53,13 @@ type Props struct {
 
 func main() {
 	// Read https://pollenvarsel.naaf.no/charts/forecast
-	resp, err := http.Get("https://pollenvarsel.naaf.no/charts/forecast")
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "https://pollenvarsel.naaf.no/charts/forecast", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req.Header.Set("UserAgent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36")
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -86,8 +93,19 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Populate regions textForecast from regionsData
+	for i, v := range pd.Props.PageProps.Data.ForecastData {
+		for j, w := range v.Regions {
+			for _, x := range pd.Props.PageProps.Data.RegionsData {
+				if w.ID == x.ID {
+					pd.Props.PageProps.Data.ForecastData[i].Regions[j].TextForecast = x.TextForecast
+				}
+			}
+		}
+	}
+
 	// Indent json
-	b, err := json.MarshalIndent(pd.Props.PageProps.Data, "", "  ")
+	b, err := json.MarshalIndent(pd.Props.PageProps.Data.ForecastData, "", "  ")
 	if err != nil {
 		log.Fatal(err)
 	}
