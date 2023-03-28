@@ -1,115 +1,45 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
+	"sync"
+	"time"
 
-	"golang.org/x/net/html"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
-type Pollendata struct {
-	Props        Props         `json:"props"`
-	Page         string        `json:"-"`
-	Query        int           `json:"-"`
-	BuildID      string        `json:"-"`
-	IsFallback   bool          `json:"-"`
-	Gssp         bool          `json:"-"`
-	ScriptLoader []interface{} `json:"-"`
-}
-type Pollen struct {
-	Bjork  int `json:"bjork"`
-	Burot  int `json:"burot"`
-	Gress  int `json:"gress"`
-	Hassel int `json:"hassel"`
-	Or     int `json:"or"`
-	Salix  int `json:"salix"`
-}
-type Regions struct {
-	ID           string `json:"id"`
-	Pollen       Pollen `json:"pollen"`
-	TextForecast string `json:"forecast,-"`
-}
-type ForecastData struct {
-	Date    string    `json:"date"`
-	Regions []Regions `json:"regions"`
-}
-type RegionsData struct {
-	ID           string `json:"id"`
-	TextForecast string `json:"textForecast"`
-}
-type Data struct {
-	ForecastData []ForecastData `json:"forecastData"`
-	RegionsData  []RegionsData  `json:"regionsData"`
-}
-type PageProps struct {
-	Data Data `json:"data"`
-}
-type Props struct {
-	PageProps PageProps `json:"pageProps"`
-	NSsp      bool      `json:"-"`
-}
+var (
+	cache        Pollendata
+	lock         sync.RWMutex
+	writeCacheCh = make(chan Pollendata, 1)
+	lastUpdated  = time.Time{}
+)
 
 func main() {
-	// Read https://pollenvarsel.naaf.no/charts/forecast
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://pollenvarsel.naaf.no/charts/forecast", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	req.Header.Set("UserAgent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36")
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
+	log.Println("Starting server...")
+	// Start updateCache loop
+	go updateCache()
 
-	doc, err := html.Parse(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Sleep for 10 seconds to let cache update
+	time.Sleep(10 * time.Second)
 
-	var pollendata string
-	var data func(*html.Node)
-	data = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "script" {
-			for _, a := range n.Attr {
-				if a.Key == "id" && a.Val == "__NEXT_DATA__" {
-					pollendata = n.FirstChild.Data
-				}
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			data(c)
-		}
-	}
-	data(doc)
+	// Start webserver
+	log.Println("Starting webserver...")
+	r := chi.NewRouter()
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.NewCompressor(5, "br, gzip, deflate").Handler)
+	r.Use(middleware.Recoverer)
 
-	// Unmarshal pollendata to Pollendata struct
-	var pd Pollendata
-	err = json.Unmarshal([]byte(pollendata), &pd)
-	if err != nil {
-		log.Fatal(err)
-	}
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("pollendata"))
+	})
+	r.Get("/regions", getRegions)
+	r.Get("/pollen/{region}", getPollen)
+	r.Get("/forecast/{region}", getForecast)
 
-	// Populate regions textForecast from regionsData
-	for i, v := range pd.Props.PageProps.Data.ForecastData {
-		for j, w := range v.Regions {
-			for _, x := range pd.Props.PageProps.Data.RegionsData {
-				if w.ID == x.ID {
-					pd.Props.PageProps.Data.ForecastData[i].Regions[j].TextForecast = x.TextForecast
-				}
-			}
-		}
-	}
+	log.Fatal(http.ListenAndServe(":8080", r))
 
-	// Indent json
-	b, err := json.MarshalIndent(pd.Props.PageProps.Data.ForecastData, "", "  ")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Print json
-	fmt.Println(string(b))
 }
