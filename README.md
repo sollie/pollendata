@@ -1,4 +1,4 @@
-# pollen_scrape
+# pollendata
 
-Scrape pollen information from https://naaf.no/pollenvarsel.
-Dumps it to stdout as json.
+Fetch and cache pollendata from https://pollenvarsel.naaf.no/charts/forecast.
+Expose as rest api.

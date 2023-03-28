@@ -17,6 +17,11 @@ var (
 	lastUpdated  = time.Time{}
 )
 
+type Server struct {
+	Router *chi.Mux
+	Routes []string
+}
+
 func main() {
 	log.Println("Starting server...")
 	// Start updateCache loop
@@ -27,19 +32,28 @@ func main() {
 
 	// Start webserver
 	log.Println("Starting webserver...")
-	r := chi.NewRouter()
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.NewCompressor(5, "br, gzip, deflate").Handler)
-	r.Use(middleware.Recoverer)
+	s := NewServer()
+	s.MountHandlers()
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("pollendata"))
-	})
-	r.Get("/regions", getRegions)
-	r.Get("/pollen/{region}", getPollen)
-	r.Get("/forecast/{region}", getForecast)
+	log.Fatal(http.ListenAndServe(":8080", s.Router))
+}
 
-	log.Fatal(http.ListenAndServe(":8080", r))
+func NewServer() *Server {
+	s := &Server{}
+	s.Router = chi.NewRouter()
+	return s
+}
 
+func (s *Server) MountHandlers() {
+	// middleware
+	s.Router.Use(middleware.RealIP)
+	s.Router.Use(middleware.NoCache)
+	s.Router.Use(middleware.Logger)
+	s.Router.Use(middleware.NewCompressor(5, "application/json").Handler)
+	s.Router.Use(middleware.Recoverer)
+
+	// Routes
+	s.Router.Get("/regions", getRegions)
+	s.Router.Get("/pollen/{region}", getPollen)
+	s.Router.Get("/forecast/{region}", getForecast)
 }
