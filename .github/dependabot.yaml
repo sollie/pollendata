@@ -6,7 +6,5 @@ updates:
       interval: "weekly"
   - package-ecosystem: "docker"
     directory: "/"
-    registries:
-      - ecr-docker
     schedule:
       interval: "weekly"
