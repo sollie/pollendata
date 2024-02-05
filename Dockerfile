@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.21.0-alpine AS builder
 #FROM public.ecr.aws/docker/library/golang:1.20-alpine AS builder
 WORKDIR /builder
 RUN apk update && apk --no-cache add ca-certificates tzdata
