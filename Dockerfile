@@ -6,7 +6,7 @@ RUN apk update && apk --no-cache add ca-certificates tzdata
 ADD source /builder
 RUN CGO_ENABLED=0 go build -o pollendata
 
-FROM ghcr.io/sollie/docker-upx:v4.2.2 AS upx
+FROM ghcr.io/sollie/docker-upx:v4.2.3 AS upx
 WORKDIR /upx
 COPY --from=builder /builder/pollendata /upx/pollendata
 RUN upx --best pollendata
