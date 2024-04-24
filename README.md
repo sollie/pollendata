@@ -7,6 +7,7 @@ Fetches and caches pollendata from https://pollenvarsel.naaf.no/charts/forecast.
 * /regions - lists available regions
 * /pollen/{region} - pollen data for {region}
 * /forecast/{region} - text forecast for {region}
+* /combined/{region} - combined pollen data and text forecast for {region}
 
 ## About the levels
 
