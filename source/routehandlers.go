@@ -72,3 +72,38 @@ func getForecast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func getCombined(w http.ResponseWriter, r *http.Request) {
+	region := chi.URLParam(r, "region")
+	log.Printf("Getting combined data for %s...\n", region)
+	var pollen = make(map[string]Pollen)
+	var forecast = make(map[string]string)
+
+	lock.RLock()
+	for _, p := range cache.Props.PageProps.Data.ForecastData {
+		for _, r := range p.Regions {
+			if r.ID == region {
+				pollen[p.Date] = r.Pollen
+			}
+		}
+	}
+	for _, r := range cache.Props.PageProps.Data.RegionsData {
+		if r.ID == region {
+			forecast[r.ID] = r.TextForecast
+		}
+	}
+	lock.RUnlock()
+
+	combined := map[string]interface{}{
+		"pollen":   pollen,
+		"forecast": forecast,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(combined)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+}

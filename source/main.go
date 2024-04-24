@@ -24,13 +24,10 @@ type Server struct {
 
 func main() {
 	log.Println("Starting server...")
-	// Start updateCache loop
 	go updateCache()
 
-	// Sleep for 10 seconds to let cache update
 	time.Sleep(10 * time.Second)
 
-	// Start webserver
 	log.Println("Starting webserver...")
 	s := NewServer()
 	s.MountHandlers()
@@ -45,15 +42,14 @@ func NewServer() *Server {
 }
 
 func (s *Server) MountHandlers() {
-	// middleware
 	s.Router.Use(middleware.RealIP)
 	s.Router.Use(middleware.NoCache)
 	s.Router.Use(middleware.Logger)
 	s.Router.Use(middleware.NewCompressor(5, "application/json").Handler)
 	s.Router.Use(middleware.Recoverer)
 
-	// Routes
 	s.Router.Get("/regions", getRegions)
 	s.Router.Get("/pollen/{region}", getPollen)
 	s.Router.Get("/forecast/{region}", getForecast)
+	s.Router.Get("/combined/{region}", getCombined)
 }

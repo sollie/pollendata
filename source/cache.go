@@ -11,33 +11,28 @@ import (
 
 func updateCache() {
 	log.Println("Starting cache update loop...")
-	// Start loop to update cache, run every 10 seconds
 	for {
-		// Check if cache is younger than 60 minutes, if so, skip update
 		if time.Since(lastUpdated) < 60*time.Minute {
 			continue
 		}
 
-		// Get raw Data
 		pollendata, err := getRawData()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		// Unmarshal pollendata to Pollendata struct
 		var pd Pollendata
 		err = json.Unmarshal([]byte(pollendata), &pd)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		// Lock and update cache
 		lock.Lock()
 		cache = pd
 		lastUpdated = time.Now()
 		lock.Unlock()
 
-		// Write to cache
+		// Todo?
 		// writeCacheCh <- pd
 		time.Sleep(10 * time.Second)
 	}
@@ -45,7 +40,6 @@ func updateCache() {
 
 func getRawData() (string, error) {
 	log.Println("Getting raw data from pollenvarsel.naaf.no...")
-	// Read https://pollenvarsel.naaf.no/charts/forecast
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://pollenvarsel.naaf.no/charts/forecast", nil)
 	if err != nil {
