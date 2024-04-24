@@ -9,6 +9,7 @@ type Pollendata struct {
 	Gssp         bool          `json:"-"`
 	ScriptLoader []interface{} `json:"-"`
 }
+
 type Pollen struct {
 	Bjork  int `json:"bjork"`
 	Burot  int `json:"burot"`
@@ -17,26 +18,32 @@ type Pollen struct {
 	Or     int `json:"or"`
 	Salix  int `json:"salix"`
 }
+
 type Regions struct {
 	ID           string `json:"id"`
 	Pollen       Pollen `json:"pollen"`
 	TextForecast string `json:"forecast,-"`
 }
+
 type ForecastData struct {
 	Date    string    `json:"date"`
 	Regions []Regions `json:"regions"`
 }
+
 type RegionsData struct {
 	ID           string `json:"id"`
 	TextForecast string `json:"textForecast"`
 }
+
 type Data struct {
 	ForecastData []ForecastData `json:"forecastData"`
 	RegionsData  []RegionsData  `json:"regionsData"`
 }
+
 type PageProps struct {
 	Data Data `json:"data"`
 }
+
 type Props struct {
 	PageProps PageProps `json:"pageProps"`
 	NSsp      bool      `json:"-"`
