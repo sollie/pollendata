@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
+	"net/http/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,4 +54,24 @@ func (s *Server) MountHandlers() {
 	s.Router.Get("/pollen/{region}", getPollen)
 	s.Router.Get("/forecast/{region}", getForecast)
 	s.Router.Get("/combined/{region}", getCombined)
+
+	pprofRouter := chi.NewRouter()
+	pprofRouter.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			host := strings.Split(r.RemoteAddr, ":")[0]
+			if host != "127.0.0.1" && host != "::1" && host != "localhost" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	pprofRouter.HandleFunc("/", pprof.Index)
+	pprofRouter.HandleFunc("/cmdline", pprof.Cmdline)
+	pprofRouter.HandleFunc("/profile", pprof.Profile)
+	pprofRouter.HandleFunc("/symbol", pprof.Symbol)
+	pprofRouter.HandleFunc("/trace", pprof.Trace)
+
+	s.Router.Mount("/debug/pprof", pprofRouter)
 }

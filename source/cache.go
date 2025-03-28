@@ -13,6 +13,7 @@ func updateCache() {
 	log.Println("Starting cache update loop...")
 	for {
 		if time.Since(lastUpdated) < 60*time.Minute {
+			time.Sleep(1 * time.Second)
 			continue
 		}
 
