@@ -19,6 +19,5 @@ WORKDIR /app
 COPY --from=upx /upx/pollendata /app/
 
 EXPOSE 8080
-EXPOSE 6060
 
 ENTRYPOINT ["/app/pollendata"]
