@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"sync"
 	"time"
 
@@ -52,4 +53,22 @@ func (s *Server) MountHandlers() {
 	s.Router.Get("/pollen/{region}", getPollen)
 	s.Router.Get("/forecast/{region}", getForecast)
 	s.Router.Get("/combined/{region}", getCombined)
+
+	// Add pprof routes
+	s.Router.Mount("/debug/pprof", http.HandlerFunc(pprof.Index))
+	s.Router.Mount("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	s.Router.Mount("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	s.Router.Mount("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+	s.Router.Mount("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+
+	// Restrict access to pprof routes to localhost
+	s.Router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.RemoteAddr != "127.0.0.1" && r.RemoteAddr != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
 }

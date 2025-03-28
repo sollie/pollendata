@@ -18,5 +18,6 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 WORKDIR /app
 COPY --from=upx /upx/pollendata /app/
 
-ENTRYPOINT ["/app/pollendata"]
+EXPOSE 6060
 
+ENTRYPOINT ["/app/pollendata"]
