@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -54,21 +55,23 @@ func (s *Server) MountHandlers() {
 	s.Router.Get("/forecast/{region}", getForecast)
 	s.Router.Get("/combined/{region}", getCombined)
 
-	// Add pprof routes
-	s.Router.Mount("/debug/pprof", http.HandlerFunc(pprof.Index))
-	s.Router.Mount("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	s.Router.Mount("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	s.Router.Mount("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	s.Router.Mount("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-
-	// Restrict access to pprof routes to localhost
-	s.Router.Use(func(next http.Handler) http.Handler {
+	pprofRouter := chi.NewRouter()
+	pprofRouter.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.RemoteAddr != "127.0.0.1" && r.RemoteAddr != "::1" {
+			host := strings.Split(r.RemoteAddr, ":")[0]
+			if host != "127.0.0.1" && host != "::1" && host != "localhost" {
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)
 		})
 	})
+
+	pprofRouter.HandleFunc("/", pprof.Index)
+	pprofRouter.HandleFunc("/cmdline", pprof.Cmdline)
+	pprofRouter.HandleFunc("/profile", pprof.Profile)
+	pprofRouter.HandleFunc("/symbol", pprof.Symbol)
+	pprofRouter.HandleFunc("/trace", pprof.Trace)
+
+	s.Router.Mount("/debug/pprof", pprofRouter)
 }
