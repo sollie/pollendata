@@ -94,7 +94,7 @@ func getCombined(w http.ResponseWriter, r *http.Request) {
 	}
 	lock.RUnlock()
 
-	combined := map[string]interface{}{
+	combined := map[string]any{
 		"pollen":   pollen,
 		"forecast": forecast,
 	}

@@ -1,13 +1,13 @@
 package main
 
 type Pollendata struct {
-	Props        Props         `json:"props"`
-	Page         string        `json:"-"`
-	Query        int           `json:"-"`
-	BuildID      string        `json:"-"`
-	IsFallback   bool          `json:"-"`
-	Gssp         bool          `json:"-"`
-	ScriptLoader []interface{} `json:"-"`
+	Props        Props  `json:"props"`
+	Page         string `json:"-"`
+	Query        int    `json:"-"`
+	BuildID      string `json:"-"`
+	IsFallback   bool   `json:"-"`
+	Gssp         bool   `json:"-"`
+	ScriptLoader []any  `json:"-"`
 }
 
 type Pollen struct {
