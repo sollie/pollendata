@@ -2,11 +2,22 @@ package main
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(b)
+}
 
 func isCacheEmpty() bool {
 	lock.RLock()
@@ -14,10 +25,25 @@ func isCacheEmpty() bool {
 	return len(cache.Props.PageProps.Data.RegionsData) == 0
 }
 
-func cacheNotReady(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusServiceUnavailable)
-	w.Write([]byte(`{"error":"data not yet available"}`))
+func regionExists(id string) bool {
+	for _, r := range cache.Props.PageProps.Data.RegionsData {
+		if r.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func healthz(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func readyz(w http.ResponseWriter, r *http.Request) {
+	if isCacheEmpty() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not ready"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
 func getLevels(w http.ResponseWriter, r *http.Request) {
@@ -33,21 +59,15 @@ func getLevels(w http.ResponseWriter, r *http.Request) {
 		{3, "Heavy spread", "100-999", "Likely to cause symptoms in most allergy sufferers"},
 		{4, "Extreme spread", "1000+", "Severe symptoms expected"},
 	}
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(levels)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
+	writeJSON(w, http.StatusOK, levels)
 }
 
 func getRegions(w http.ResponseWriter, r *http.Request) {
 	if isCacheEmpty() {
-		cacheNotReady(w)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "data not yet available"})
 		return
 	}
-	log.Println("Getting regions...")
+	slog.Info("getting regions")
 	regions := []string{}
 
 	lock.RLock()
@@ -56,104 +76,98 @@ func getRegions(w http.ResponseWriter, r *http.Request) {
 	}
 	lock.RUnlock()
 
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(regions)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
+	writeJSON(w, http.StatusOK, regions)
 }
 
 func getPollen(w http.ResponseWriter, r *http.Request) {
 	if isCacheEmpty() {
-		cacheNotReady(w)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "data not yet available"})
 		return
 	}
 	region := chi.URLParam(r, "region")
-	log.Printf("Getting pollen for %s...\n", region)
-	var pollen = make(map[string]Pollen)
 
 	lock.RLock()
+	exists := regionExists(region)
+	if !exists {
+		lock.RUnlock()
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "region not found"})
+		return
+	}
+	pollen := make(map[string]Pollen)
 	for _, p := range cache.Props.PageProps.Data.ForecastData {
-		for _, r := range p.Regions {
-			if r.ID == region {
-				pollen[p.Date] = r.Pollen
+		for _, reg := range p.Regions {
+			if reg.ID == region {
+				pollen[p.Date] = reg.Pollen
 			}
 		}
 	}
 	lock.RUnlock()
 
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(pollen)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
+	slog.Info("getting pollen", "region", region)
+	writeJSON(w, http.StatusOK, pollen)
 }
 
 func getForecast(w http.ResponseWriter, r *http.Request) {
 	if isCacheEmpty() {
-		cacheNotReady(w)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "data not yet available"})
 		return
 	}
 	region := chi.URLParam(r, "region")
-	log.Printf("Getting forecast for %s...\n", region)
-	var forecast = make(map[string]string)
 
 	lock.RLock()
-	for _, r := range cache.Props.PageProps.Data.RegionsData {
-		if r.ID == region {
-			forecast[r.ID] = r.TextForecast
+	exists := regionExists(region)
+	if !exists {
+		lock.RUnlock()
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "region not found"})
+		return
+	}
+	var textForecast string
+	for _, reg := range cache.Props.PageProps.Data.RegionsData {
+		if reg.ID == region {
+			textForecast = reg.TextForecast
+			break
 		}
 	}
 	lock.RUnlock()
 
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(forecast)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
+	slog.Info("getting forecast", "region", region)
+	writeJSON(w, http.StatusOK, map[string]string{region: textForecast})
 }
 
 func getCombined(w http.ResponseWriter, r *http.Request) {
 	if isCacheEmpty() {
-		cacheNotReady(w)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "data not yet available"})
 		return
 	}
 	region := chi.URLParam(r, "region")
-	log.Printf("Getting combined data for %s...\n", region)
-	var pollen = make(map[string]Pollen)
-	var forecast = make(map[string]string)
 
 	lock.RLock()
+	exists := regionExists(region)
+	if !exists {
+		lock.RUnlock()
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "region not found"})
+		return
+	}
+	pollen := make(map[string]Pollen)
 	for _, p := range cache.Props.PageProps.Data.ForecastData {
-		for _, r := range p.Regions {
-			if r.ID == region {
-				pollen[p.Date] = r.Pollen
+		for _, reg := range p.Regions {
+			if reg.ID == region {
+				pollen[p.Date] = reg.Pollen
 			}
 		}
 	}
-	for _, r := range cache.Props.PageProps.Data.RegionsData {
-		if r.ID == region {
-			forecast[r.ID] = r.TextForecast
+	var textForecast string
+	for _, reg := range cache.Props.PageProps.Data.RegionsData {
+		if reg.ID == region {
+			textForecast = reg.TextForecast
+			break
 		}
 	}
 	lock.RUnlock()
 
-	combined := map[string]any{
+	slog.Info("getting combined data", "region", region)
+	writeJSON(w, http.StatusOK, map[string]any{
 		"pollen":   pollen,
-		"forecast": forecast,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(combined)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
+		"forecast": map[string]string{region: textForecast},
+	})
 }
