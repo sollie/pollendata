@@ -3,7 +3,7 @@ FROM golang:1.26.2-alpine AS builder
 WORKDIR /builder
 RUN apk update && apk --no-cache add ca-certificates tzdata
 
-ADD source /builder
+COPY source/ /builder/
 RUN CGO_ENABLED=0 go build -o pollendata
 
 FROM ghcr.io/sollie/docker-upx:v5.0.1 AS upx
