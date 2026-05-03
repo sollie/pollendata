@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"golang.org/x/net/html"
 )
+
+var cacheReadyOnce sync.Once
 
 func updateCache() {
 	log.Println("Starting cache update loop...")
@@ -32,6 +35,8 @@ func updateCache() {
 		cache = pd
 		lastUpdated = time.Now()
 		lock.Unlock()
+
+		cacheReadyOnce.Do(func() { close(cacheReady) })
 
 		// Todo?
 		// writeCacheCh <- pd

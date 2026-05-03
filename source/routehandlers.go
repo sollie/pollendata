@@ -8,7 +8,45 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+func isCacheEmpty() bool {
+	lock.RLock()
+	defer lock.RUnlock()
+	return len(cache.Props.PageProps.Data.RegionsData) == 0
+}
+
+func cacheNotReady(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	w.Write([]byte(`{"error":"data not yet available"}`))
+}
+
+func getLevels(w http.ResponseWriter, r *http.Request) {
+	levels := []struct {
+		Level       int    `json:"level"`
+		Label       string `json:"label"`
+		GrainsPerM3 string `json:"grains_per_m3"`
+		Description string `json:"description"`
+	}{
+		{0, "No spread", "0", "No pollen in the air"},
+		{1, "Low spread", "1-9", "Unlikely to cause symptoms"},
+		{2, "Moderate spread", "10-99", "May cause symptoms in sensitive individuals"},
+		{3, "Heavy spread", "100-999", "Likely to cause symptoms in most allergy sufferers"},
+		{4, "Extreme spread", "1000+", "Severe symptoms expected"},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(levels)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+}
+
 func getRegions(w http.ResponseWriter, r *http.Request) {
+	if isCacheEmpty() {
+		cacheNotReady(w)
+		return
+	}
 	log.Println("Getting regions...")
 	regions := []string{}
 
@@ -28,6 +66,10 @@ func getRegions(w http.ResponseWriter, r *http.Request) {
 }
 
 func getPollen(w http.ResponseWriter, r *http.Request) {
+	if isCacheEmpty() {
+		cacheNotReady(w)
+		return
+	}
 	region := chi.URLParam(r, "region")
 	log.Printf("Getting pollen for %s...\n", region)
 	var pollen = make(map[string]Pollen)
@@ -52,6 +94,10 @@ func getPollen(w http.ResponseWriter, r *http.Request) {
 }
 
 func getForecast(w http.ResponseWriter, r *http.Request) {
+	if isCacheEmpty() {
+		cacheNotReady(w)
+		return
+	}
 	region := chi.URLParam(r, "region")
 	log.Printf("Getting forecast for %s...\n", region)
 	var forecast = make(map[string]string)
@@ -74,6 +120,10 @@ func getForecast(w http.ResponseWriter, r *http.Request) {
 }
 
 func getCombined(w http.ResponseWriter, r *http.Request) {
+	if isCacheEmpty() {
+		cacheNotReady(w)
+		return
+	}
 	region := chi.URLParam(r, "region")
 	log.Printf("Getting combined data for %s...\n", region)
 	var pollen = make(map[string]Pollen)

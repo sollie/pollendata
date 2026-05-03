@@ -17,6 +17,7 @@ var (
 	lock         sync.RWMutex
 	writeCacheCh = make(chan Pollendata, 1)
 	lastUpdated  = time.Time{}
+	cacheReady   = make(chan struct{})
 )
 
 type Server struct {
@@ -28,7 +29,8 @@ func main() {
 	log.Println("Starting server...")
 	go updateCache()
 
-	time.Sleep(10 * time.Second)
+	log.Println("Waiting for initial data fetch...")
+	<-cacheReady
 
 	log.Println("Starting webserver...")
 	s := NewServer()
@@ -51,6 +53,7 @@ func (s *Server) MountHandlers() {
 	s.Router.Use(middleware.Recoverer)
 
 	s.Router.Get("/regions", getRegions)
+	s.Router.Get("/levels", getLevels)
 	s.Router.Get("/pollen/{region}", getPollen)
 	s.Router.Get("/forecast/{region}", getForecast)
 	s.Router.Get("/combined/{region}", getCombined)
