@@ -22,7 +22,7 @@ type Pollen struct {
 type Regions struct {
 	ID           string `json:"id"`
 	Pollen       Pollen `json:"pollen"`
-	TextForecast string `json:"forecast,-"`
+	TextForecast string `json:"forecast"`
 }
 
 type ForecastData struct {

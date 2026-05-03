@@ -1,11 +1,15 @@
 package main
 
 import (
-	"log"
+	"context"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/http/pprof"
-	"strings"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -13,45 +17,68 @@ import (
 )
 
 var (
-	cache        Pollendata
-	lock         sync.RWMutex
-	writeCacheCh = make(chan Pollendata, 1)
-	lastUpdated  = time.Time{}
-	cacheReady   = make(chan struct{})
+	cache      Pollendata
+	lock       sync.RWMutex
+	cacheReady = make(chan struct{})
 )
 
-type Server struct {
-	Router *chi.Mux
-	Routes []string
-}
-
 func main() {
-	log.Println("Starting server...")
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	slog.Info("starting server")
 	go updateCache()
 
-	log.Println("Waiting for initial data fetch...")
+	slog.Info("waiting for initial data fetch")
 	<-cacheReady
 
-	log.Println("Starting webserver...")
+	slog.Info("starting webserver")
 	s := NewServer()
 	s.MountHandlers()
 
-	log.Fatal(http.ListenAndServe(":8080", s.Router))
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: s.Router,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server error", "err", err)
+			os.Exit(1)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	slog.Info("shutting down server")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("graceful shutdown failed", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("server stopped")
 }
 
 func NewServer() *Server {
-	s := &Server{}
-	s.Router = chi.NewRouter()
-	return s
+	return &Server{Router: chi.NewRouter()}
+}
+
+type Server struct {
+	Router *chi.Mux
 }
 
 func (s *Server) MountHandlers() {
 	s.Router.Use(middleware.RealIP)
 	s.Router.Use(middleware.NoCache)
-	s.Router.Use(middleware.Logger)
+	s.Router.Use(requestLogger)
 	s.Router.Use(middleware.NewCompressor(5, "application/json").Handler)
 	s.Router.Use(middleware.Recoverer)
 
+	s.Router.Get("/healthz", healthz)
+	s.Router.Get("/readyz", readyz)
 	s.Router.Get("/regions", getRegions)
 	s.Router.Get("/levels", getLevels)
 	s.Router.Get("/pollen/{region}", getPollen)
@@ -61,8 +88,8 @@ func (s *Server) MountHandlers() {
 	pprofRouter := chi.NewRouter()
 	pprofRouter.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			host := strings.Split(r.RemoteAddr, ":")[0]
-			if host != "127.0.0.1" && host != "::1" && host != "localhost" {
+			host, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil || (host != "127.0.0.1" && host != "::1") {
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}
@@ -77,4 +104,19 @@ func (s *Server) MountHandlers() {
 	pprofRouter.HandleFunc("/trace", pprof.Trace)
 
 	s.Router.Mount("/debug/pprof", pprofRouter)
+}
+
+func requestLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		start := time.Now()
+		next.ServeHTTP(ww, r)
+		slog.Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", ww.Status(),
+			"duration_ms", time.Since(start).Milliseconds(),
+			"remote_addr", r.RemoteAddr,
+		)
+	})
 }
