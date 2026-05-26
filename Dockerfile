@@ -1,4 +1,4 @@
-FROM golang:1.26.2-alpine AS builder
+FROM golang:1.26.3-alpine AS builder
 
 WORKDIR /builder
 RUN apk update && apk --no-cache add ca-certificates tzdata
@@ -6,7 +6,7 @@ RUN apk update && apk --no-cache add ca-certificates tzdata
 COPY source/ /builder/
 RUN CGO_ENABLED=0 go build -o pollendata
 
-FROM ghcr.io/sollie/docker-upx:v5.0.1 AS upx
+FROM ghcr.io/sollie/docker-upx:v5.1.1 AS upx
 WORKDIR /upx
 COPY --from=builder /builder/pollendata /upx/pollendata
 RUN upx --best pollendata
