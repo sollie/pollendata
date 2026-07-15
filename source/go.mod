@@ -4,5 +4,5 @@ go 1.26.0
 
 require (
 	github.com/go-chi/chi/v5 v5.3.0
-	golang.org/x/net v0.56.0
+	golang.org/x/net v0.57.0
 )
